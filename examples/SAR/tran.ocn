@@ -1,0 +1,178 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;        Copyright (c) 2014 Carsten Wulff Software, Norway 
+;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Created       : wulff at 2014-11-14
+;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Licensed under the Apache License, Version 2.0 (the "License")
+;; you may not use this file except in compliance with the License.
+;; You may obtain a copy of the License at
+;; 
+;;     http://www.apache.org/licenses/LICENSE-2.0
+;; 
+;; Unless required by applicable law or agreed to in writing, software
+;; distributed under the License is distributed on an "AS IS" BASIS,
+;; WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+;; See the License for the specific language governing permissions and
+;; limitations under the License.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ocnSetXLMode()
+ocnxlProjectDir( "/tmp/wulff/virtuoso" )
+ocnxlTargetCellView( "TB_RIVER_MPW2_ST28N" "TB_SAR_LPWRLS" "adexl" )
+ocnxlResultsLocation( "" )
+ocnxlSimResultsLocation( "" )
+
+;--------------------------------------------------------------------------
+; PARAMETERS
+;--------------------------------------------------------------------------
+
+ocnxlSetAllVarsDisabled(t)
+ocnxlSetAllParametersDisabled(t)
+
+;--------------------------------------------------------------------------
+; CORNERS
+;--------------------------------------------------------------------------
+#include CORNERS
+
+;--------------------------------------------------------------------------
+; TEST
+;--------------------------------------------------------------------------
+ocnxlBeginTest("tran")
+simulator( 'spectre )
+design( "TB_RIVER_MPW2_ST28N" "TB_SAR_LPWRLS" "config")
+
+#ifdef noise
+  analysis('tran ?stop "VAR(\"_end\")"  ?errpreset "conservative"  ?tranNoise "Transient Noise"  
+		?noisefmax "10G"  ?noisefmin "10k"  ?noiseseed "1"  ?noisescale ""  
+		?noisetmin ""  ?noiseupdate "step"  ?noiseonoff ""  ?noiseinst ""  )
+#else
+  analysis('tran ?stop "VAR(\"_end\")"  ?errpreset "conservative"  )
+#endif
+
+desVar(	  "F" 1	)
+desVar(	  "capx" 1f	)
+desVar(	  "cmp_ctr" 0	)
+desVar(	  "ibias" 25u	)
+#ifdef debug
+  desVar(	  "nbpt" 16	)
+#else
+  desVar(	  "nbpt" 64	)
+#endif
+
+desVar(	  "cfs" 500k	)
+desVar(	  "vdda" 400m	)
+desVar(	  "vref" 1	)
+desVar(	  "fbin" 3	)
+desVar(	  "tshift" 10n	)
+desVar(	  "td" "3/cfs"	)
+desVar(	  "vamp" "0.7"	)
+desVar(	  "_end" "(nbpt/cfs +15/cfs  + tshift + td)"	)
+option(	'dochecklimit  "no" 'redefinedparams  "ignore" )
+option( ?categ 'turboOpts	'numThreads  "16" 	'cktpreset  "Sampled" 	'apsplus  t 	'uniMode  "APS" )
+saveOption( ?saveahdlvars "all" )
+saveOption( 'useprobes "no" )
+saveOption( 'subcktprobelvl "0" )
+saveOption( 'currents "selected" )
+saveOption( 'pwr "none" )
+saveOption( 'save "allpub" )
+temp( 27 ) 
+
+#sig /AVDD_ADC_1V0
+#term /VADC/MINUS
+#term /VVREF/MINUS
+#term /VCORE/MINUS
+#sig /RO
+#sig /AVDD_1V8
+#sig /AVDD_ADC_1V0
+#sig /AVDD_VREF_1V0
+#sig /AVDD_1V0
+#sig /CK_DIG_1V8
+#sig /SAR_IP_1V0
+#sig /SAR_IN_1V0
+#sig /RO
+#sig /DO
+#sig /CK_SIN_1V8
+#sig /SAROP<0>
+#sig /SARON<0>
+#sig /I1/EN<0>
+
+
+#sig /XDUT/CK_SAMPLE
+#sig /XDUT/CK_DIG
+
+
+
+;--------------------------------------------------------------------------
+; EXPRESSIONS
+;--------------------------------------------------------------------------
+#expr idda_adc average(i("/VADC/MINUS" ?result "tran"))
+#expr idda_vref average(i("/VVREF/MINUS" ?result "tran"))
+#expr idda_1v0 average(i("/VCORE/MINUS" ?result "tran"))
+
+#expr nbpt VAR("nbpt")
+#expr cfs VAR("cfs")
+#expr fft_start ((14 / cfs) + (0.9 / cfs / 2) + VAR("tshift"))
+#expr fft_stop (fft_start + (nbpt / cfs))
+
+#expr vdd average(clipX(v("/AVDD_ADC_1V0" ?result "tran") fft_start fft_stop))
+#expr vddref average(clipX(v("/AVDD_VREF_1V0" ?result "tran") fft_start fft_stop))
+#expr offset average(clipX(ro fft_start fft_stop))
+#expr ro clipX(v("/RO" ?result "tran") fft_start fft_stop)
+#expr enob_i spectrumMeasurement(sar_o t fft_start fft_stop nbpt (cfs / nbpt) (cfs / 2) 0 "Rectangular" 0 0 1 "enob")
+#expr enob spectrumMeasurement(ro t fft_start fft_stop nbpt (cfs / nbpt) (cfs / 2) 0 "Rectangular" 0 0 1 "enob")
+#expr pw (idda_adc*vdd + idda_vref* vddref)
+#expr fom_walden (pw/ (pow(2 enob) * cfs))
+
+#expr sndr spectrumMeasurement(ro t fft_start fft_stop nbpt (cfs / nbpt) (cfs / 2) 0 "Rectangular" 0 0 1 "sinad")
+#expr rofft db20(dft(ro fft_start fft_stop nbpt))
+#expr sar_offt db20(dft(sar_o fft_start fft_stop nbpt))
+#expr f1 ((VAR("fbin") / nbpt) * cfs)
+#expr amp_f1  value(rofft f1)
+#expr enob_fs ((sndr - amp_f1 - 1.76) / 6.02)
+#expr fom_walden_fs (pw / (pow(2 enob_fs) * cfs))
+#expr sndr_osr spectrumMeasurement(ro t fft_start fft_stop nbpt (cfs / nbpt) (cfs / 2) 0 "Rectangular" 0 0 1 "sinad")
+#expr enob_fs_osr ((sndr_osr - value(rofft f1) - 1.76) / 6.02)
+#expr sfdr spectrumMeasurement(ro t fft_start fft_stop nbpt (cfs / nbpt) (cfs / 2) 0 "Rectangular" 0 0 1 "sfdr")
+
+ocnxlEndTest() ; "tran"
+ocnxlEnableTest("tran")
+
+;--------------------------------------------------------------------------
+; CORNERSETUP
+;--------------------------------------------------------------------------
+#include CORNERSETUP
+
+;--------------------------------------------------------------------------
+; JOBSETUP
+;--------------------------------------------------------------------------
+ocnxlJobSetup( '(
+	"blockemail" "1"
+	"configuretimeout" "300"
+	"distributionmethod" "Local"
+	"lingertimeout" "300"
+	"maxjobs" "8"
+	"name" "ADE XL Default"
+	"preemptivestart" "1"
+	"reconfigureimmediately" "1"
+	"runtimeout" "-1"
+	"showerrorwhenretrying" "1"
+	"showoutputlogerror" "0"
+	"startmaxjobsimmed" "1"
+	"starttimeout" "300"
+	"usesameprocess" "1"
+) )
+
+;====================== Run Mode Options ======================================
+ocnxlMonteCarloOptions( ?mcMethod "mismatch" ?mcNumPoints "10" ?mcNumBins "" ?samplingMode "lhs" ?mcStopEarly "0" ?saveAllPlots "0" ?useReference "0" ?donominal "0" ?monteCarloSeed "12345" ?mcStartingRunNumber "1" ?saveProcess "0" ?saveMismatch "1" ?mcStopMethod "Significance Test" ?dumpParamMode "yes" )
+
+;====================== Run command ============================================
+#ifdef mc
+  ocnxlRun( ?mode 'monteCarlo ?nominalCornerEnabled nil ?allCornersEnabled t ?allSweepsEnabled t)
+#else
+  ocnxlRun( ?mode 'sweepsAndCorners ?nominalCornerEnabled nil ?allCornersEnabled t ?allSweepsEnabled t)
+#endif
+
+ocnxlOutputSummary(?exprSummary t ?specSummary t ?detailed t ?wave t)
+
+;====================== End XL Mode command ===================================
+ocnxlEndXLMode()
+exit()

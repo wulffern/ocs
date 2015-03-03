@@ -11,9 +11,9 @@ Some love the SKILL language (a LISP variant), but I'm not one of them. There ar
 - Extracts simulation values from log file into a csv file.
 
 For example:
-'''
+```
 oc ocean tran --corners "typical" --config "" --define "" --run
-'''
+```
 
 
 ##Warning
