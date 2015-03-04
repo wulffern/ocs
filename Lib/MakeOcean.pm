@@ -22,9 +22,10 @@
   use base "Object";
   use strict;
   use Cwd 'abs_path';
+  use Cwd;
 
   sub initialize{
-	my $self = shift;
+    my $self = shift;
 
     my $help = <<"EOF";
 
@@ -39,16 +40,16 @@ EOF
   }
 
   sub makeOptionString{
-	my $self = shift;
-	
-	my @definesArray = split(/\s+/,$self->option("define"));
+    my $self = shift;
+
+    my @definesArray = split(/\s+/,$self->option("define"));
     foreach my $def (@definesArray) {
       $self->{defines}->{$def} = 1;
     }
 
-	#- Create the corner name_
+    #- Create the corner name_
     my $crn = "";
-	my $view = $self->option("config");
+    my $view = $self->option("config");
     if ($view) {
       $crn .= $view."_";
     }
@@ -57,14 +58,14 @@ EOF
       $crn .= join("_",@definesArray)."_";
     }
 
-	my @crns = split(/\s+/,$self->option("corners"));
+    my @crns = split(/\s+/,$self->option("corners"));
 
     foreach my $corner (@crns) {
-	  $self->{corners}->{$corner} = 1;
+      $self->{corners}->{$corner} = 1;
       $crn .= "$corner";
     }
 
-	return $crn;
+    return $crn;
   }
 
 
@@ -78,19 +79,19 @@ EOF
     }
 
 
-	my $crn = $self->makeOptionString;
+    my $crn = $self->makeOptionString;
 
     #- Read corner files and create corners setup
     my $cornerfile = $self->readCornerFile("../corners.ocn");
     $cornerfile .= $self->readCornerFile("corners.ocn");
 
-	#- Read parameter files
+    #- Read parameter files
     $self->readParamFile("../ocean.par");
     $self->readParamFile("ocean.par");
 
     my $cornersetup = "";
     foreach my $c (keys(%{$self->{cornerLookup}})) {
-	  unless(exists $self->{corners}->{$c}){
+      unless (exists $self->{corners}->{$c}) {
         $cornersetup .= $self->{cornerLookup}->{$c}."\n";
       }
     }
@@ -100,7 +101,7 @@ EOF
     my $isIfdef = 0;
     my $isElse = 0;
     my $buffer = "";
-	my $nameIfdef = "";
+    my $nameIfdef = "";
     open(fi,"<${tb}.ocn") or die "Could not open $tb";
     while (<fi>) {
 
@@ -151,7 +152,8 @@ EOF
         } elsif (exists($self->{include}->{$incName})) {
           $str .= $self->{include}->{$incName};
         } else {
-          $self->comment("#Warning: Could not find $incName");
+          $self->comment("#ERROR: Could not find parameter '$incName'");
+	  exit;
         }
         $skipcurrent = 1;
       }
@@ -178,9 +180,13 @@ EOF
         $skipcurrent = 1;
       }
 
-	  my $view = $self->option("config");
+      my $view = $self->option("config");
       if (m/^ocnxlTargetCellView\(/) {
         s/adexl/ocean_$crn/;
+
+	#- Add SKILL variables
+	$str .=  "simulation_name = \"${tb}_${crn}\"\n";
+	$str .= "simulation_path = \"".cwd()."\"\n";
       }
 
       if ($view && m/^design\(/) {
@@ -198,7 +204,7 @@ EOF
     }
 
 
-	my $outfile = $self->option("outfile");
+    my $outfile = $self->option("outfile");
 
     my $filename = $tb.".${crn}.ocn";
     $outfile = $dir."/".$filename unless ($outfile);
@@ -210,8 +216,8 @@ EOF
     print fo "exit()\n";
     close(fo) or die "Could not close $outfile\n";
 
-	my $run  = $self->option("run");
-	my $cdsdir  = $self->option("cdsdir");
+    my $run  = $self->option("run");
+    my $cdsdir  = $self->option("cdsdir");
 
     if ($run && $cdsdir) {
       my $path = abs_path($outfile);
@@ -225,8 +231,8 @@ EOF
       system($cmd);
 
       my $pid = $self->parseLog($log);
-	  my $extract = new Extract();
-	  $extract->run("${outfile}.log");
+      my $extract = new Extract();
+      $extract->run("${outfile}.log");
 
     }
 
@@ -236,10 +242,10 @@ EOF
 
 
   sub readParamFile{
-	my $self = shift;
+    my $self = shift;
     my $file = shift;
     return "" unless -f $file;
-    open(fi,"< $file");
+    open(fi,"< $file") or die "Could not open $file";
     my $isSection = 0;
     my $nameSection = "";
     my $buffer;
@@ -251,9 +257,11 @@ EOF
       }
 
       if (m/^\s*#end/) {
+#	print $buffer."\n";
         $self->{include}->{$nameSection} = $buffer;
         $isSection = 0;
       }
+
       next if m/^\s*#/;
       next if m/^\s\*/;
 
@@ -267,7 +275,7 @@ EOF
 
 
   sub readCornerFile{
-	my $self = shift;
+    my $self = shift;
     my $file = shift;
     return "" unless -f $file;
     open(fi,"< $file");
@@ -285,7 +293,7 @@ EOF
 
 
   sub parseLog{
-	my $self = shift;
+    my $self = shift;
     my $file = shift;
     my $start = 0;
     my $pid = 0;
