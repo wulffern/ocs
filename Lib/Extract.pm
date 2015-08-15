@@ -87,9 +87,9 @@ use strict;
     open(fi,"< $file") or die "Could not open $file";
     while (<fi>) {
 
-      if (m/UTC\s+(\S+)/) {
+      if (m/UTC\s+(\S+)\s+(\S+)/) {
 #		print $1."\n";
-		$self->{date} = $1;
+		$self->{date} = $1." ".$2;
 	  }
 
       if (m/^\# Process Id:\s+(\S+)/) {
@@ -128,6 +128,7 @@ use strict;
 	my $outfile = shift;
     open(fo,">$outfile") or die "Could not open $outfile";
     my @keys = keys(%{$self->{dataHash}});
+	return unless @keys;
     foreach my $key (@keys) {
       print fo $key."${delimiter}";
     }
@@ -188,6 +189,7 @@ use strict;
       $outfile =~ s/\.ocn\.log/\.csv/;
       $self->parseFile($file);
       $self->printCsv($outfile);
+#	        $self->printCsv("-");
     }
 
 	return $self->{pid};

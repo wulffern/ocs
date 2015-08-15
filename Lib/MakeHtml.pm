@@ -27,7 +27,8 @@ use Getopt::Long;
   sub initialize{
     my $self = shift;
 
-	$self->addOption("outfile=s","outfile","");
+	$self->addOption("outfile=s","outfile","-");
+	$self->addOption("format=s","format","html");
     $self->addOption("param=s","param",".*");
 	$self->addOption("fileregex=s","fileregex","");
 
@@ -189,6 +190,30 @@ use Getopt::Long;
 
   }
 
+  sub toTerminal{
+	my $self = shift;
+	my $header = shift;
+
+	$header =~ s/\.|_/ /ig;
+
+	$str =  sprintf "%-20s %-30s %-10s %-10s \n","Parameter","Corner","Typical","Date";
+    my $count = 0;
+	my @params = sort(keys(%{$self->{table}}));
+    foreach my $param (@params) {
+	  #- Sort by date
+      my @keys = sort{ $self->{table}->{$param}->{$b}->[4] cmp $self->{table}->{$param}->{$a}->[4] } (keys(%{$self->{table}->{$param}}));
+
+      foreach my $key (@keys) {
+        my @values = @{$self->{table}->{$param}->{$key}};
+		$str .= sprintf "%-20s %-30s %-10s %-10s \n",$param,$key,$values[1],$values[4];
+      $count +=1;
+      }
+
+    }
+    return $str;
+
+  }
+
   sub runMe{
     my $self = shift;
 
@@ -208,11 +233,15 @@ use Getopt::Long;
       $self->calcRow($self->{data}->{$key},$key);
     }
 
-    my $str =  $self->toHtml($fregex);
+    my $str;
+
+	if($self->option("format") eq "html"){
+	  $str = $self->toHtml($fregex);
+	}elsif($self->option("format") eq "term"){
+	  $self->option("outfile","-");
+	  $str = $self->toTerminal($fregex);
+	}
 	$self->writeFile($self->option("outfile"),$str);
-
-
-
   }
 
 }
