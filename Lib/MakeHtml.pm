@@ -196,7 +196,7 @@ use Getopt::Long;
 
 	$header =~ s/\.|_/ /ig;
 
-	$str =  sprintf "%-20s %-30s %-10s %-10s \n","Parameter","Corner","Typical","Date";
+	$str =  sprintf "%-20s %-30s %-10s %-10s %-10s %-10s\n","Parameter","Corner","Min","Typical","Max","Date";
     my $count = 0;
 	my @params = sort(keys(%{$self->{table}}));
     foreach my $param (@params) {
@@ -205,7 +205,7 @@ use Getopt::Long;
 
       foreach my $key (@keys) {
         my @values = @{$self->{table}->{$param}->{$key}};
-		$str .= sprintf "%-20s %-30s %-10s %-10s \n",$param,$key,$values[1],$values[4];
+		$str .= sprintf "%-20s %-30s %-10s %-10s %-10s %-10s\n",$param,$key,$values[0],$values[1],$values[2],$values[4];
       $count +=1;
       }
 
