@@ -23,6 +23,7 @@
   use strict;
   use Cwd 'abs_path';
   use Cwd;
+  use Time::Piece; 
 
   sub initialize{
     my $self = shift;
@@ -206,6 +207,8 @@ EOF
 
     my $outfile = $self->option("outfile");
 
+	my $t = localtime;
+	my $date = $t->ymd("-")."_".$t->hms("-");
     my $filename = $tb.".${crn}.ocn";
     $outfile = $dir."/".$filename unless ($outfile);
 
@@ -221,7 +224,7 @@ EOF
 
     if ($run && $cdsdir) {
       my $path = abs_path($outfile);
-      my $log = $path.".log";
+      my $log = $path.".${date}.log";
 
       my $cmd = "cd $cdsdir; ocean -replay $path -log $log";
       if ($self->option("verbose") == 0) {
@@ -232,7 +235,7 @@ EOF
 
       my $pid = $self->parseLog($log);
       my $extract = new Extract();
-      $extract->run("${outfile}.log");
+      $extract->run($log);
 
     }
 

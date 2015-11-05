@@ -20,6 +20,8 @@
 use Data::Dumper;
 use Getopt::Long;
 use strict;
+use File::Basename;
+
 { package Extract;
 
   use base "Object";
@@ -50,10 +52,15 @@ use strict;
       return;
     }
 
+#	print $_;
+	
     my ($key,$val) = m/\s+(\S+)\s+(\S+)/;
 
+	
     next unless $key;
 
+
+	
     if (!exists($self->{dataHash}->{$key})) {
       my @array;
       $self->{dataHash}->{$key} = \@array;
@@ -96,9 +103,9 @@ use strict;
         $self->{pid} = $1;
       }
 
-      if ($start && ! m/\\o/) {
-        $start = 0;
-      }
+#      if ($start && ! m/\\o/) {
+#        $start = 0;
+#      }
 
       next unless m/\\o/;
       s/\\o//;
@@ -114,8 +121,12 @@ use strict;
 
 
       if ($start) {
-         $self->parseLine($_);
+
+		$self->parseLine($_);
       }
+
+#	  next if m/wave/;
+#	  print $_;
 
     }
     close(fi) or die "Could not close $file";
@@ -185,10 +196,10 @@ use strict;
       undef $self->{max};
       undef $self->{dataHash};
 	  undef $self->{data};
-      $outfile =~ s/^[^\/]+/results/;
-      $outfile =~ s/\.ocn\.log/\.csv/;
+	  $outfile =~ s/^.*\//results\//ig;
+      $outfile =~ s/\.ocn(\.\d+-\d+-\d+_\d+-\d+-\d+)?\.log/\.csv/;
       $self->parseFile($file);
-      $self->printCsv($outfile);
+     $self->printCsv($outfile);
 #	        $self->printCsv("-");
     }
 
