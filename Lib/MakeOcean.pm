@@ -73,7 +73,7 @@ EOF
   sub runMe{
     my $self = shift;
     my $tb = shift;
-    my $dir = $tb."_output";
+    my $dir = "output_".$tb;
 
     if ( ! -d $dir) {
       mkdir $dir;
